@@ -60,7 +60,7 @@ statement_handler = proc do |downloaded_statement|
     })
 
     if response.status == 200
-  #   HSBC.update_last_statement_date
+      HSBC.update_last_statement_date
       puts "Statement uploaded successfully."
     else
       puts "Statement upload failed! (#{response.status}: #{response.body})."
