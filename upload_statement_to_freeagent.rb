@@ -41,7 +41,7 @@ end
 statement_date_range = [HSBC.last_statement_date, Date.today]
 
 statement_handler = proc do |downloaded_statement|
-  authenticator = FreeAgent::Authenticator.new(FreeAgent.credentials_from_keychain)
+  authenticator = FreeAgent::Authenticator.new(FreeAgent.credentials_from_keychain('com.freeagent.api.CLI'))
 
   # we will need multipart upload support for statements
   authenticator.client.connection.build do |faraday|

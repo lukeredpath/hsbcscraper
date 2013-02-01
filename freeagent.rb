@@ -4,8 +4,8 @@ require 'keychain'
 require 'oauth2'
 
 module FreeAgent
-  def self.credentials_from_keychain
-    credentials = Keychain.generic_passwords.where(:service => 'com.freeagent.api.CLI').first
+  def self.credentials_from_keychain(service_name)
+    credentials = Keychain.generic_passwords.where(:service => service_name).first
 
     if credentials.nil?
       # TODO: support oauth registration 
