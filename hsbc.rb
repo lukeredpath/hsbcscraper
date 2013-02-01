@@ -1,34 +1,12 @@
-require 'rubygems'
-require 'mechanize'
+$LOAD_PATH.unshift(".")
+
+require 'scraper'
 require 'keychain'
 
-class Scraper
-  def initialize(url)
-    @url = url
-    @flows = []
-  end
-  
-  def self.build(url, &block)
-    scraper = new(url)
-    scraper.instance_eval(&block)
-    scraper
-  end
-  
-  def use(flow)
-    @flows << flow
-  end
-  
-  def run
-    agent = Mechanize.new
-    agent.get(@url)
-    
-    @flows.each do |flow|
-      flow.run(agent)
-    end
-  end
-end
-
 module HSBC
+  HISTORY_FILE_PATH = File.expand_path("~/.hsbc")
+  BANKING_URL = "https://www.business.hsbc.co.uk/1/2/home"
+  
   class Login
     def initialize(username, password, keyfob)
       @username = username
@@ -84,10 +62,10 @@ module HSBC
   end
   
   class DownloadStatement
-    def initialize(account_number, download_handler, date_range = nil)
+    def initialize(account_number, date_range = nil, &block)
       @account_number = account_number
       @date_range = date_range
-      @download_handler = download_handler
+      @download_handler = block
     end
     
     def run(agent)
@@ -125,7 +103,7 @@ module HSBC
       agent.current_page.form_with(name: /statement/) do |form|
         form.fileFormat = 'QIF'
         file = form.submit
-        @download_handler.handle_downloaded_file(file)
+        @download_handler.call(file) if @download_handler
         agent.back
       end
     end
@@ -141,30 +119,35 @@ module HSBC
       gets.strip
     end
   end
-end
-
-class StatementSaver
-  def initialize(path)
-    @path = path
+  
+  def self.update_last_statement_date
+    File.open(HISTORY_FILE_PATH, 'w') do |io|
+      io.write({"last_statement_date" => Date.today}.to_yaml)
+    end
   end
   
-  def handle_downloaded_file(file)
-    file.save(@path)
+  def self.last_statement_date
+    YAML.load(File.read(HISTORY_FILE_PATH))["last_statement_date"]
   end
 end
 
-BANKING_URL = "https://www.business.hsbc.co.uk/1/2/home"
+if __FILE__ == $0
+  download_handler = ->(downloaded_file) {
+    downloaded_file.save('/Users/luke/Desktop/statement.qif')
+  }
 
-# a 'delegate' object used by the DownloadStatement flow, saves it to disk
-statement_saver = StatementSaver.new('/Users/luke/Desktop/statement.qif')
+  # username, password and bank account number are stored in the OSX keychain
+  keychain_item = Keychain.generic_passwords.where(:service => 'hsbc-business').first
+  
+  raise "Couldn't find keychain item!" unless keychain_item
 
-# username, password and bank account number are stored in the OSX keychain
-keychain_item = Keychain.items.find { |item| item.label == 'hsbc-business' }
+  statement_date_range = [HSBC.last_statement_date, Date.today]
 
-scraper = Scraper.build(BANKING_URL) do
-  use HSBC::Login.new(keychain_item.account, keychain_item.password, HSBC::InteractiveShellKeyfob.new)
-  use HSBC::DownloadStatement.new(keychain_item.comment, statement_saver)
-  use HSBC::Logout
+  scraper = Scraper.build(HSBC::BANKING_URL) do
+    use HSBC::Login.new(keychain_item.account, keychain_item.password, HSBC::InteractiveShellKeyfob.new)
+    use HSBC::DownloadStatement.new(keychain_item.comment, statement_date_range, &download_handler)
+    use HSBC::Logout
+  end
+
+  scraper.run
 end
-
-scraper.run
