@@ -1,10 +1,12 @@
 $LOAD_PATH.unshift(".")
 
+require 'bundler/setup'
 require 'hsbc'
 require 'freeagent'
 require 'tempfile'
 require 'typhoeus'
 require 'yaml'
+require 'qif'
 
 HSBC_BANK_ACCOUNT_ID = 7213
 
@@ -58,10 +60,14 @@ statement_handler = proc do |downloaded_statement|
     response = token.post("/v2/bank_transactions/statement?bank_account=#{HSBC_BANK_ACCOUNT_ID}", {
       :body => {:statement => Faraday::UploadIO.new(file_to_upload, 'text/qif')}
     })
+    
+    file_to_upload.rewind
+    qif = Qif::Reader.new(file_to_upload.read)
 
     if response.status == 200
       HSBC.update_last_statement_date
       puts "Statement uploaded successfully."
+      puts "#{qif.size} transactions imported."
     else
       puts "Statement upload failed! (#{response.status}: #{response.body})."
       exit 1

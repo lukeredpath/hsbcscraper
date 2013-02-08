@@ -35,6 +35,7 @@ GEM
       jwt (~> 0.1.4)
       multi_json (~> 1.0)
       rack (~> 1.2)
+    qif (1.1.1)
     rack (1.5.1)
     ruby-keychain (0.1.0)
       corefoundation (~> 0.1.3)
@@ -52,5 +53,6 @@ PLATFORMS
 DEPENDENCIES
   mechanize
   oauth2
+  qif
   ruby-keychain
   typhoeus
